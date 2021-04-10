@@ -5,6 +5,7 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.location.Location;
+import android.util.Log;
 
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -21,15 +22,16 @@ public  class ManejoBBDD extends SQLiteOpenHelper {
 
     public ManejoBBDD(Context context) {
 
-        super(context, "paradasMetro.db",null,3);
+        super(context, "paradasMetro.db3",null,3);
         mContext = context;
-        rutaAlmacenamiento = mContext.getFilesDir().getParentFile().getPath() + "/databases/paradasMetro.db";
+        rutaAlmacenamiento = mContext.getDatabasePath("paradasMetro.db3").getPath();
     }
 
     public void OpenDatabase(Context context){
         try {
             //no es la primera vez que se accede a la BD
-            this.getReadableDatabase();
+          //  this.getWritableDatabase();
+          //  this.getReadableDatabase();
             database = SQLiteDatabase.openDatabase(rutaAlmacenamiento,null,SQLiteDatabase.OPEN_READONLY);
         }catch (Exception e){
             copiarBD(context);
@@ -39,33 +41,36 @@ public  class ManejoBBDD extends SQLiteOpenHelper {
 
     private void copiarBD(Context context){
         try {
-            InputStream datosEntrada = context.getAssets().open("paradasMetro.db");
+            InputStream datosEntrada = context.getAssets().open("paradasMetro.db3");
             OutputStream datosSalidad = new FileOutputStream(rutaAlmacenamiento);
             byte[] bufferDB = new byte[1024];
 
             int longitud;
             while ((longitud = datosEntrada.read(bufferDB))>0){
-                datosSalidad.flush();
-                datosSalidad.close();
-                datosEntrada.close();
+                datosSalidad.write(bufferDB,0,longitud);
             }
+            datosSalidad.flush();
+            datosSalidad.close();
+            datosEntrada.close();
         }catch (Exception e){
 
         }
+
     }
 
     public Location datosEstacion(int id){
-        Location estacion;
+        Location estacion = null;
         Cursor cursor;
-        cursor = database.rawQuery("SELECT * FROM paradas WHERE id ="+id,null);
+        cursor = database.rawQuery("SELECT * FROM Paradas WHERE id ="+id,null);
         cursor.moveToFirst();
 
+        if( cursor != null && cursor.moveToFirst() ){
         estacion = new Location(cursor.getString(1));
         estacion.setLatitude(Double.parseDouble(cursor.getString(2)));
         estacion.setLongitude(Double.parseDouble(cursor.getString(3)));
+        }
 
         cursor.close();
-
         return estacion;
     }
 
@@ -77,20 +82,22 @@ public  class ManejoBBDD extends SQLiteOpenHelper {
             lineas[i] = new Lineas();
             lineas[i].nombre = nombresDeLineas[i]; // alamcenando el nombre de cada linea
 
-            cursor = database.rawQuery("SELECT id FROM "+ nombresDeLineas[i],null); // consulta a la tabla para obtener los id de las estaciones
+            cursor = database.rawQuery("SELECT Id FROM "+ nombresDeLineas[i],null); // consulta a la tabla para obtener los id de las estaciones
+          //  cursor = database.query(nombresDeLineas[i], new String[]{"Id"},null,null,null,null,null);
             lineas[i].estaciones = new Location[cursor.getCount()];
 
             int contador = 0;
-            cursor.moveToFirst();
+           cursor.moveToFirst();
 
-            while (!cursor.isAfterLast()){
-                int estacion = Integer.parseInt(cursor.getString(0)); //almacen del id de cada estacion
-                lineas[i].estaciones[contador] = datosEstacion(estacion);
-                contador++;
+            if( cursor != null && cursor.moveToFirst() ){
+                while (!cursor.isAfterLast()){
+                    int estacion = Integer.parseInt(cursor.getString(0)); //almacen del id de cada estacion
+                    lineas[i].estaciones[contador] = datosEstacion(estacion);
+                    contador++;
 
-                cursor.moveToNext();
+                    cursor.moveToNext();
+                }
             }
-
         }
 
         if (cursor!=null && !cursor.isClosed()){
@@ -100,8 +107,7 @@ public  class ManejoBBDD extends SQLiteOpenHelper {
         return lineas;
     }
 
-    public void cerrarBD(){
-        database.close();
+    public void cerrarBD(){database.close();
     }
 
     @Override
